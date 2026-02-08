@@ -1,0 +1,306 @@
+# AppScope Agent Configuration
+# Documentation: https://docs.appscope.io/agent
+# Version: 1.0.0
+
+# ============================================================================
+# REQUIRED: API Key and Server Configuration
+# ============================================================================
+
+# Your project API key (from AppScope dashboard)
+# Get your API key at: https://appscope.io/dashboard/projects
+# Format: ask_proj_xxxxxxxxxxxxxxxx
+api_key: "ask_proj_xxxxxxxxxxxxxxxx"
+
+# AppScope server URL
+# Production: https://api.appscope.io
+# Self-hosted: https://your-appscope-instance.com
+server_url: "https://api.appscope.io"
+
+# Project name for identification in dashboard
+# This helps you identify which application this agent is monitoring
+project: "my-application"
+
+# ============================================================================
+# Collection Settings
+# ============================================================================
+
+# How often to collect and send metrics (in seconds)
+# Default: 30 seconds
+# Min: 10, Max: 3600 (1 hour)
+collection_interval: 30
+
+# Maximum number of items to send in a single batch
+# Helps manage network bandwidth and server load
+# Default: 100
+batch_size: 100
+
+# Start reading log files from the beginning on first run
+# true: Read entire log file history (useful for initial setup)
+# false: Only read new log entries (recommended for production)
+start_from_beginning: false
+
+# ============================================================================
+# Services to Monitor
+# ============================================================================
+
+services:
+  # Backend API Service
+  - name: "backend-api"
+    type: "backend"
+
+    # Log files to monitor
+    log_paths:
+      - /var/log/myapp/app.log
+      - /var/log/myapp/error.log
+
+    # Optional: Health check endpoint
+    # Agent will periodically check this URL and report status
+    health_url: "http://localhost:8000/health"
+    health_interval: 60  # seconds
+
+  # Frontend / Nginx
+  - name: "frontend"
+    type: "frontend"
+    log_paths:
+      - /var/log/nginx/access.log
+      - /var/log/nginx/error.log
+
+  # PostgreSQL Database
+  - name: "main-database"
+    type: "postgresql"
+
+    # Database connection details
+    database:
+      host: localhost
+      port: 5432
+      user: monitor_readonly
+      password: "${DB_PASSWORD}"  # Environment variable support
+      database: myapp
+
+      # SSL configuration (optional)
+      sslmode: prefer  # disable, require, verify-ca, verify-full
+
+      # Connection pool settings
+      max_connections: 5
+      connection_timeout: 10  # seconds
+
+      # Metrics-only mode: only collect performance metrics
+      # Does not read actual data from tables
+      metrics_only: true
+
+  # Redis Cache (optional)
+  - name: "cache"
+    type: "redis"
+    database:
+      host: localhost
+      port: 6379
+      password: "${REDIS_PASSWORD}"  # Optional
+      database: 0  # Redis database number
+
+  # MySQL/MariaDB (optional example)
+  # - name: "mysql-database"
+  #   type: "mysql"
+  #   database:
+  #     host: localhost
+  #     port: 3306
+  #     user: monitor_readonly
+  #     password: "${MYSQL_PASSWORD}"
+  #     database: myapp
+  #     metrics_only: true
+
+  # MongoDB (optional example)
+  # - name: "mongodb"
+  #   type: "mongodb"
+  #   database:
+  #     host: localhost
+  #     port: 27017
+  #     user: monitor
+  #     password: "${MONGO_PASSWORD}"
+  #     database: myapp
+  #     auth_database: admin
+
+# ============================================================================
+# System Metrics Collection
+# ============================================================================
+
+system_metrics:
+  # Enable system-level monitoring
+  enabled: true
+
+  # CPU metrics (usage, load average, per-core stats)
+  collect_cpu: true
+
+  # Memory metrics (used, free, swap, buffers, cache)
+  collect_memory: true
+
+  # Disk metrics (usage, I/O stats, inode usage)
+  collect_disk: true
+
+  # Disk paths to monitor (optional, defaults to all mounted filesystems)
+  disk_paths:
+    - /
+    - /var
+    - /home
+
+  # Network metrics (throughput, connections, errors)
+  collect_network: true
+
+  # Network interfaces to monitor (optional, defaults to all)
+  network_interfaces:
+    - eth0
+    - eth1
+
+  # Process metrics (top consumers by CPU/memory)
+  collect_processes: true
+  top_processes_count: 10  # Number of top processes to track
+
+# ============================================================================
+# Log Parsing Configuration
+# ============================================================================
+
+log_parsing:
+  # Auto-detect log format (JSON, logfmt, common log format, etc.)
+  auto_detect: true
+
+  # Maximum line length to process (bytes)
+  max_line_length: 10000
+
+  # Extract structured fields from logs
+  extract_fields: true
+
+  # Custom regex patterns for log parsing (optional)
+  # patterns:
+  #   - name: "custom_app_log"
+  #     regex: '(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<message>.*)'
+
+  # Error detection patterns
+  error_patterns:
+    - "ERROR"
+    - "FATAL"
+    - "Exception"
+    - "panic:"
+    - "stack trace"
+    - "500 Internal Server Error"
+    - "connection refused"
+    - "timeout"
+
+# ============================================================================
+# Agent Health Endpoint
+# ============================================================================
+
+# Local HTTP endpoint for health checks
+# Useful for monitoring the agent itself with tools like Docker healthcheck
+health_endpoint:
+  enabled: true
+  port: 9090
+  path: "/health"
+
+  # Example health check:
+  # curl http://localhost:9090/health
+  # Returns: {"status": "healthy", "collectors": {...}}
+
+# ============================================================================
+# Logging Configuration
+# ============================================================================
+
+logging:
+  # Log level: debug, info, warn, error
+  level: info
+
+  # Log output file (omit or set to empty string for stdout)
+  file: /var/log/appscope/agent.log
+
+  # Log file rotation
+  rotate:
+    enabled: true
+    max_size_mb: 100
+    max_backups: 5
+    max_age_days: 30
+    compress: true
+
+  # Log format: text or json
+  format: text
+
+  # Include timestamps in logs
+  timestamps: true
+
+# ============================================================================
+# Advanced Configuration
+# ============================================================================
+
+advanced:
+  # Retry configuration for sending data
+  retry:
+    max_retries: 3
+    initial_backoff: 1  # seconds
+    max_backoff: 60     # seconds
+    backoff_multiplier: 2
+
+  # Buffer size for in-memory event storage (before sending)
+  buffer_size: 1000
+
+  # Enable compression for data transmission
+  compression: true
+
+  # Connection timeout for API requests (seconds)
+  connection_timeout: 30
+
+  # Enable TLS verification for server connection
+  tls_verify: true
+
+  # Custom CA certificate path (for self-signed certificates)
+  # ca_cert_path: /etc/appscope/ca.crt
+
+  # HTTP proxy configuration (optional)
+  # http_proxy: "http://proxy.example.com:8080"
+  # https_proxy: "http://proxy.example.com:8080"
+  # no_proxy: "localhost,127.0.0.1"
+
+# ============================================================================
+# Alert Configuration (Optional)
+# ============================================================================
+
+# Configure local alert thresholds (agent will flag events)
+# Note: This doesn't send alerts directly - it tags events for the server
+alerts:
+  # CPU usage threshold
+  cpu_threshold: 90  # percent
+
+  # Memory usage threshold
+  memory_threshold: 90  # percent
+
+  # Disk usage threshold
+  disk_threshold: 85  # percent
+
+  # Response time threshold
+  response_time_threshold: 5000  # milliseconds
+
+  # Error rate threshold (errors per minute)
+  error_rate_threshold: 10
+
+# ============================================================================
+# Metadata (Optional)
+# ============================================================================
+
+# Additional metadata to include with all events
+# Useful for multi-environment deployments
+metadata:
+  environment: "production"
+  region: "us-east-1"
+  datacenter: "dc1"
+  version: "1.2.3"
+  # custom_field: "custom_value"
+
+# ============================================================================
+# Feature Flags
+# ============================================================================
+
+features:
+  # Enable real-time log streaming (WebSocket)
+  realtime_streaming: true
+
+  # Enable anomaly detection (local ML-based detection)
+  anomaly_detection: false
+
+  # Enable distributed tracing integration
+  distributed_tracing: false

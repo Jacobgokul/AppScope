@@ -1,0 +1,112 @@
+# AppScope Agent Docker Compose Configuration
+# Provides easy containerized deployment of the agent
+
+version: '3.8'
+
+services:
+  appscope-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: "1.0.0"
+        BUILD_TIME: "${BUILD_TIME:-unknown}"
+        GIT_COMMIT: "${GIT_COMMIT:-unknown}"
+
+    image: appscope/agent:latest
+
+    container_name: appscope-agent
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Environment variables
+    environment:
+      # API credentials (REQUIRED)
+      - APPSCOPE_API_KEY=${APPSCOPE_API_KEY:?API key required - set APPSCOPE_API_KEY in .env}
+      - APPSCOPE_SERVER_URL=${APPSCOPE_SERVER_URL:-https://api.appscope.io}
+
+      # Database credentials (optional)
+      - DB_PASSWORD=${DB_PASSWORD:-}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - MONGO_PASSWORD=${MONGO_PASSWORD:-}
+
+      # Agent configuration
+      - APPSCOPE_LOG_LEVEL=${APPSCOPE_LOG_LEVEL:-info}
+      - APPSCOPE_COLLECTION_INTERVAL=${APPSCOPE_COLLECTION_INTERVAL:-30}
+
+    # Volumes
+    volumes:
+      # Config file
+      - ./config.yaml:/etc/appscope/config.yaml:ro
+
+      # Persistent data and logs
+      - appscope-logs:/var/log/appscope
+      - appscope-data:/var/lib/appscope
+
+      # Mount host logs for monitoring (read-only)
+      # Customize these paths for your application
+      - /var/log:/host/var/log:ro
+      - /var/lib/docker/containers:/host/var/lib/docker/containers:ro
+
+      # For system metrics
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+
+    # Network mode: host gives access to all network interfaces
+    # Comment this out if you don't need system network metrics
+    # network_mode: host
+
+    # Alternative: use bridge network with specific ports
+    ports:
+      - "9090:9090"  # Health check endpoint
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW  # For network monitoring
+      - SYS_PTRACE  # For process monitoring
+    read_only: true
+    tmpfs:
+      - /tmp
+
+# Volumes
+volumes:
+  appscope-logs:
+    driver: local
+  appscope-data:
+    driver: local
+
+# Networks
+networks:
+  default:
+    name: appscope
+    driver: bridge

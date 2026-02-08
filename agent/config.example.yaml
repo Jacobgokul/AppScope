@@ -1,0 +1,39 @@
+# AppScope Agent Configuration
+
+api_key: "ask_live_your_api_key_here"
+project: "my-app"
+server_url: "https://api.appscope.io"
+
+# Service name identifies this instance in multi-server deployments
+# If not specified, defaults to hostname
+service_name: "backend-api"
+
+# Log files to monitor
+logs:
+  - /var/log/myapp/app.log
+  - /var/log/nginx/access.log
+  - /var/log/nginx/error.log
+
+# Database configuration (optional)
+database:
+  type: postgres
+  host: localhost
+  port: 5432
+  user: monitor_readonly
+  password: "${DB_PASSWORD}"  # Can use environment variables
+  dbname: myapp
+  metrics_only: true  # Only collect metrics, don't read data
+
+# System metrics
+system_metrics: true
+
+# Collection interval in seconds
+collection_interval: 30
+
+# Health check endpoint port (default: 9090)
+# Access at http://localhost:9090/health for local verification
+health_port: 9090
+
+# Start log collection from beginning of files (default: false)
+# If false, only new log lines after agent start are collected
+start_from_beginning: false

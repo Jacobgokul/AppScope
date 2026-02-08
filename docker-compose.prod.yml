@@ -1,0 +1,260 @@
+# =============================================================================
+# AppScope - Production Docker Compose Override Configuration
+# =============================================================================
+# This file extends docker-compose.yml with production-specific settings.
+#
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Or use the Makefile:
+#   make prod
+#
+# IMPORTANT: Before deploying to production:
+#   1. Generate strong SECRET_KEY: openssl rand -hex 32
+#   2. Change database password
+#   3. Set up TLS certificates (via reverse proxy)
+#   4. Configure proper backup strategy
+#   5. Set up monitoring and alerting
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # TimescaleDB - Production configuration
+  # ---------------------------------------------------------------------------
+  db:
+    restart: always
+    environment:
+      # Override with production credentials from .env
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_DB: ${DB_NAME:-appscope}
+    # Production: Remove port exposure (only accessible via Docker network)
+    ports: []
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    # Production-optimized PostgreSQL settings
+    command: >
+      postgres
+      -c shared_buffers=512MB
+      -c effective_cache_size=1536MB
+      -c maintenance_work_mem=128MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=16MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c max_worker_processes=4
+      -c max_parallel_workers_per_gather=2
+      -c max_parallel_workers=4
+      -c max_parallel_maintenance_workers=2
+      -c log_statement=mod
+      -c log_min_duration_statement=1000
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ---------------------------------------------------------------------------
+  # Redis - Production configuration
+  # ---------------------------------------------------------------------------
+  redis:
+    restart: always
+    # Production: Remove port exposure
+    ports: []
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --tcp-backlog 511
+      --timeout 0
+      --tcp-keepalive 300
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Backend - Production configuration
+  # ---------------------------------------------------------------------------
+  backend:
+    restart: always
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    environment:
+      # Database connection
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD}@db:5432/${DB_NAME:-appscope}
+      # Security - MUST be set via environment variable
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      # Application settings
+      DEBUG: "false"
+      APP_NAME: AppScope
+      API_V1_PREFIX: /api/v1
+      # CORS - production origins only
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
+      # Redis connection
+      REDIS_URL: redis://redis:6379/0
+      # AI/LLM configuration
+      LLM_API_URL: ${LLM_API_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      # Workers based on CPU cores (2-4 x num_cores)
+      WORKERS: ${WORKERS:-4}
+    # Production: Don't expose directly, use reverse proxy
+    ports: []
+    # Production: No volume mounts (use built image)
+    volumes: []
+    # Production command with multiple workers
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --workers ${WORKERS:-4}
+      --limit-concurrency 100
+      --limit-max-requests 10000
+      --access-log
+      --proxy-headers
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+      # Enable rolling updates
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ---------------------------------------------------------------------------
+  # Frontend - Production configuration (nginx serving static files)
+  # ---------------------------------------------------------------------------
+  frontend:
+    restart: always
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        VITE_API_URL: ${API_URL:-https://api.appscope.io}
+    # Production: Serve via reverse proxy
+    ports: []
+    # Production: No volume mounts
+    volumes: []
+    # Remove development command (use Dockerfile CMD)
+    command: []
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Nginx Reverse Proxy - TLS termination and load balancing
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: appscope-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - appscope-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# =============================================================================
+# Production Networks
+# =============================================================================
+networks:
+  appscope-network:
+    driver: bridge
+    name: appscope-network
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+
+# =============================================================================
+# Production Volumes
+# =============================================================================
+volumes:
+  pgdata:
+    name: appscope-pgdata-prod
+    # Consider using external volume or cloud storage for production
+  redis_data:
+    name: appscope-redis-data-prod

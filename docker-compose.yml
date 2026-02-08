@@ -1,0 +1,156 @@
+# =============================================================================
+# AppScope - Development Docker Compose Configuration
+# =============================================================================
+# Usage:
+#   docker-compose up        # Start all services
+#   docker-compose up -d     # Start in background
+#   docker-compose logs -f   # Follow logs
+#   docker-compose down      # Stop all services
+#   docker-compose down -v   # Stop and remove volumes (reset data)
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # TimescaleDB - Time-series database (PostgreSQL extension)
+  # ---------------------------------------------------------------------------
+  db:
+    image: timescale/timescaledb:latest-pg15
+    container_name: appscope-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: appscope
+      # Performance tuning for development
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      # Persist database data
+      - pgdata:/var/lib/postgresql/data
+      # Optional: Mount init scripts
+      # - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d appscope"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - appscope-network
+
+  # ---------------------------------------------------------------------------
+  # Redis - Caching and session storage (optional but recommended)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: appscope-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      # Persist Redis data
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - appscope-network
+
+  # ---------------------------------------------------------------------------
+  # Backend - FastAPI application
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: appscope-backend
+    restart: unless-stopped
+    environment:
+      # Database connection (uses Docker DNS)
+      DATABASE_URL: postgresql+asyncpg://postgres:password@db:5432/appscope
+      # Security - use strong key in production!
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      # Application settings
+      DEBUG: "true"
+      APP_NAME: AppScope
+      API_V1_PREFIX: /api/v1
+      # CORS - allow frontend origins
+      CORS_ORIGINS: '["http://localhost:3000","http://localhost:5173","http://127.0.0.1:3000","http://127.0.0.1:5173"]'
+      # Redis connection (optional)
+      REDIS_URL: redis://redis:6379/0
+      # AI/LLM configuration (optional)
+      LLM_API_URL: ${LLM_API_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Mount source code for hot reload during development
+      - ./backend:/app
+      # Exclude virtual environment (use container's venv)
+      - /app/env
+      - /app/__pycache__
+    # Development command with auto-reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
+    networks:
+      - appscope-network
+
+  # ---------------------------------------------------------------------------
+  # Frontend - React application (development mode)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: appscope-frontend
+    restart: unless-stopped
+    environment:
+      # API URL for frontend
+      VITE_API_URL: http://localhost:8000
+      # Node environment
+      NODE_ENV: development
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    volumes:
+      # Mount source code for hot reload
+      - ./frontend:/app
+      # Preserve node_modules from container (faster builds)
+      - /app/node_modules
+    # Development command with HMR
+    command: npm run dev -- --host 0.0.0.0
+    networks:
+      - appscope-network
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  appscope-network:
+    driver: bridge
+    name: appscope-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  pgdata:
+    name: appscope-pgdata
+  redis_data:
+    name: appscope-redis-data

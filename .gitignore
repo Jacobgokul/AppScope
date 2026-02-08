@@ -1,0 +1,119 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.pyc
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Frontend
+node_modules/
+dist/
+.cache/
+.parcel-cache/
+build/
+.next/
+out/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+vendor/
+
+# Agent binary
+agent/appscope-agent
+agent/appscope-agent.exe
+
+# Config files (use .example versions)
+backend/.env
+frontend/.env
+agent/config.yaml
+
+# Testing
+.coverage
+.pytest_cache/
+coverage/
+htmlcov/
+.tox/
+.hypothesis/
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Alembic (keep migrations tracked)
+# backend/alembic/versions/*.py
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Claude AI files
+.claude/
+claude_workspace/
+CLAUDE.md
+
+# Documentation (only keep root README.md)
+backend/*.md
+!backend/README.md
+frontend/*.md
+agent/*.md
+!agent/README.md
+
+# Agent binaries (all platforms)
+agent/appscope
+agent/appscope.exe

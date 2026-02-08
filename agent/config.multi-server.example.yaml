@@ -1,0 +1,93 @@
+# AppScope Agent Configuration - Multi-Server Deployment Example
+#
+# This example shows how to configure the agent for multi-server deployments
+# where you need to monitor multiple instances of the same application.
+#
+# Use Case: You have 3 backend servers all running the same application.
+# Each server should report data with its own service_name to distinguish them.
+
+# ============================================================================
+# Server 1: backend-api-01
+# ============================================================================
+# On first backend server (e.g., 192.168.1.101)
+# Save this as /etc/appscope/config.yaml on server 1
+
+api_key: "ask_live_your_api_key_here"
+project: "my-app"
+server_url: "https://api.appscope.io"
+
+# Unique identifier for this server
+service_name: "backend-api-01"
+
+logs:
+  - /var/log/myapp/app.log
+  - /var/log/nginx/access.log
+
+database:
+  type: postgres
+  host: localhost
+  port: 5432
+  user: monitor_readonly
+  password: "${DB_PASSWORD}"
+  dbname: myapp
+  metrics_only: true
+
+system_metrics: true
+collection_interval: 30
+health_port: 9090
+
+# ============================================================================
+# Server 2: backend-api-02
+# ============================================================================
+# On second backend server (e.g., 192.168.1.102)
+# Update the service_name to distinguish this instance:
+
+# api_key: "ask_live_your_api_key_here"  # Same API key
+# project: "my-app"                       # Same project
+# server_url: "https://api.appscope.io"
+# service_name: "backend-api-02"          # Different service name
+# ...rest of config...
+
+# ============================================================================
+# Server 3: backend-api-03
+# ============================================================================
+# On third backend server (e.g., 192.168.1.103)
+
+# service_name: "backend-api-03"
+
+# ============================================================================
+# Benefits of using service_name:
+# ============================================================================
+#
+# 1. Identify which specific server is experiencing issues
+# 2. Compare metrics across different servers
+# 3. Correlate problems to specific instances
+# 4. Monitor load balancing distribution
+# 5. Track individual server health over time
+#
+# Dashboard will show:
+# - backend-api-01: CPU 45%, Memory 60%, 120 req/sec
+# - backend-api-02: CPU 89%, Memory 85%, 45 req/sec  ← Problem detected!
+# - backend-api-03: CPU 43%, Memory 58%, 125 req/sec
+#
+# AI Analysis will explain:
+# "backend-api-02 shows elevated CPU (89%) and reduced throughput (45 req/sec)
+#  compared to other instances. Logs show database connection pool exhaustion
+#  starting at 14:23 UTC. Root cause: This server's database connection pool
+#  is undersized (10 connections vs 50 on other servers)."
+
+# ============================================================================
+# Default Behavior:
+# ============================================================================
+# If service_name is not specified, the agent will default to the hostname.
+# This is usually sufficient, but using explicit names like "backend-api-01"
+# is clearer than hostnames like "ip-192-168-1-101.ec2.internal".
+
+# ============================================================================
+# Naming Conventions:
+# ============================================================================
+# Recommended patterns:
+# - <service-type>-<instance>: backend-api-01, frontend-nginx-02
+# - <region>-<service>-<instance>: us-east-backend-01, eu-west-backend-01
+# - <environment>-<service>-<instance>: prod-api-01, staging-api-01
+# - <datacenter>-<service>-<instance>: dc1-api-01, dc2-api-01

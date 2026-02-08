@@ -1,0 +1,67 @@
+# =============================================================================
+# Agent Docker Ignore
+# =============================================================================
+# Files and directories to exclude from Docker build context.
+# =============================================================================
+
+# Binary output (will be rebuilt in container)
+appscope
+appscope.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing artifacts
+coverage.out
+coverage.html
+*.test
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Docker
+Dockerfile
+docker-compose*.yml
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Configuration files (sensitive)
+config.yaml
+*.yaml
+!config.example.yaml
+
+# Vendor directory (optional - can include for reproducible builds)
+# vendor/
+
+# Debug files
+*.log
+debug/

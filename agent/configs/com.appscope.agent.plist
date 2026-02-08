@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Service Identification -->
+    <key>Label</key>
+    <string>com.appscope.agent</string>
+
+    <!-- Program Configuration -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/appscope</string>
+        <string>--config</string>
+        <string>/etc/appscope/config.yaml</string>
+    </array>
+
+    <!-- Working Directory -->
+    <key>WorkingDirectory</key>
+    <string>/var/lib/appscope</string>
+
+    <!-- Run as user (optional - defaults to root when loaded in /Library/LaunchDaemons) -->
+    <key>UserName</key>
+    <string>appscope</string>
+    <key>GroupName</key>
+    <string>appscope</string>
+
+    <!-- Auto-start on boot -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Keep alive - restart if crashes -->
+    <key>KeepAlive</key>
+    <dict>
+        <!-- Always keep alive -->
+        <key>SuccessfulExit</key>
+        <false/>
+
+        <!-- Restart if crashes -->
+        <key>Crashed</key>
+        <true/>
+
+        <!-- Only run when network is available -->
+        <key>NetworkState</key>
+        <true/>
+    </dict>
+
+    <!-- Restart throttling -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Standard output and error logs -->
+    <key>StandardOutPath</key>
+    <string>/var/log/appscope/agent.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/appscope/agent-error.log</string>
+
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- Add environment variables here if needed -->
+        <!-- Example:
+        <key>DB_PASSWORD</key>
+        <string>secret</string>
+        -->
+    </dict>
+
+    <!-- Resource limits -->
+    <key>SoftResourceLimits</key>
+    <dict>
+        <!-- Maximum open files -->
+        <key>NumberOfFiles</key>
+        <integer>8192</integer>
+
+        <!-- Maximum processes -->
+        <key>NumberOfProcesses</key>
+        <integer>512</integer>
+    </dict>
+
+    <!-- Process type -->
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <!-- Nice value (process priority) -->
+    <!-- 0 is normal, positive values are lower priority -->
+    <key>Nice</key>
+    <integer>0</integer>
+
+    <!-- Launch only when these paths exist -->
+    <key>WatchPaths</key>
+    <array>
+        <string>/etc/appscope/config.yaml</string>
+    </array>
+
+    <!-- Exit timeout -->
+    <key>ExitTimeOut</key>
+    <integer>30</integer>
+
+    <!-- Disable logging to system.log -->
+    <key>Debug</key>
+    <false/>
+
+    <!-- Run in background -->
+    <key>AbandonProcessGroup</key>
+    <true/>
+</dict>
+</plist>

@@ -1,0 +1,108 @@
+[Unit]
+Description=AppScope Monitoring Agent
+Documentation=https://docs.appscope.io
+After=network-online.target
+Wants=network-online.target
+
+# Start after database services if they're on the same host
+After=postgresql.service mysql.service mongodb.service redis.service
+# But don't require them (agent will handle connection errors gracefully)
+
+[Service]
+Type=simple
+
+# Run as dedicated user for security
+User=appscope
+Group=appscope
+
+# Agent binary and configuration
+ExecStart=/usr/local/bin/appscope --config /etc/appscope/config.yaml
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=5min
+StartLimitBurst=4
+
+# Standard output and error to systemd journal
+StandardOutput=journal
+StandardError=journal
+
+# Logging
+SyslogIdentifier=appscope-agent
+
+# Environment variables
+# Uncomment and set if needed
+# Environment="DB_PASSWORD=secret"
+# Environment="REDIS_PASSWORD=secret"
+# EnvironmentFile=/etc/appscope/environment
+
+# Working directory
+WorkingDirectory=/var/lib/appscope
+
+# Security hardening
+# These options improve security by limiting what the agent can do
+
+# Prevent privilege escalation
+NoNewPrivileges=true
+
+# Protect system directories (read-only)
+ProtectSystem=strict
+
+# Protect home directories (agent typically doesn't need access)
+ProtectHome=true
+
+# Allow writing to these directories
+ReadWritePaths=/var/log/appscope
+ReadWritePaths=/var/lib/appscope
+
+# Allow reading log files (add your custom log paths here)
+ReadOnlyPaths=/var/log
+
+# Protect kernel settings
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Restrict network namespaces
+RestrictNamespaces=true
+
+# System call filtering (security)
+# This prevents the agent from making dangerous system calls
+# Comment out if you encounter issues
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+
+# Restrict address families (only IPv4 and IPv6)
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# Prevent gaining new privileges
+PrivateTmp=true
+
+# Prevent access to /dev
+PrivateDevices=true
+
+# Resource limits
+# Prevent agent from consuming excessive resources
+
+# Maximum memory (1GB)
+MemoryLimit=1G
+
+# Maximum CPU usage (50% of one core)
+CPUQuota=50%
+
+# Maximum number of open files
+LimitNOFILE=8192
+
+# Maximum number of processes
+LimitNPROC=512
+
+# Timeout settings
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+
+# Watchdog (optional - requires agent support)
+# WatchdogSec=60s
+
+[Install]
+WantedBy=multi-user.target
