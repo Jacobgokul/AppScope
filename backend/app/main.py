@@ -6,10 +6,57 @@ from pathlib import Path
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+import gzip
 
 from app.config import settings
 from app.api.v1.router import api_router
 from app.db.session import engine, Base
+
+
+class GzipRequestMiddleware:
+    """Raw ASGI middleware to decompress gzip-encoded request bodies."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # Check for gzip content-encoding in headers
+        headers = dict(scope.get("headers", []))
+        content_encoding = headers.get(b"content-encoding", b"").decode()
+
+        if content_encoding == "gzip":
+            # Collect the body
+            body_parts = []
+            while True:
+                message = await receive()
+                body_parts.append(message.get("body", b""))
+                if not message.get("more_body", False):
+                    break
+
+            # Decompress
+            compressed_body = b"".join(body_parts)
+            try:
+                decompressed_body = gzip.decompress(compressed_body)
+            except Exception:
+                decompressed_body = compressed_body
+
+            # Create new receive that returns decompressed body
+            body_sent = False
+
+            async def new_receive():
+                nonlocal body_sent
+                if not body_sent:
+                    body_sent = True
+                    return {"type": "http.request", "body": decompressed_body, "more_body": False}
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            await self.app(scope, new_receive, send)
+        else:
+            await self.app(scope, receive, send)
 
 
 @asynccontextmanager
@@ -42,7 +89,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With", "Content-Encoding"],
     expose_headers=["*"],
 )
 
@@ -74,3 +121,7 @@ async def get_install_script():
         "#!/bin/bash\necho 'Install script not found. Please download from releases.'\nexit 1",
         media_type="text/x-shellscript"
     )
+
+
+# Wrap app with Gzip middleware LAST (after all FastAPI config)
+app = GzipRequestMiddleware(app)

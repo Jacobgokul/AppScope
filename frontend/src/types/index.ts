@@ -89,13 +89,15 @@ export interface LogEvent {
   timestamp: string
   level: string
   source: string | null
-  service: string | null
+  service: string | null  // alias for service_name for UI compatibility
+  service_name: string | null
   message: string
   stack_trace: string | null
   http_method: string | null
   http_path: string | null
   http_status: number | null
   response_time_ms: number | null
+  extra_metadata: Record<string, unknown> | null
 }
 
 export interface HealthStatus {

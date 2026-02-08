@@ -22,18 +22,28 @@ class LogEventResponse(BaseModel):
     id: UUID
     timestamp: datetime
     level: str
-    source: str | None
-    service: str | None
+    source: str | None = None
+    service_name: str | None = None
     message: str
-    stack_trace: str | None
-    http_method: str | None
-    http_path: str | None
-    http_status: int | None
-    response_time_ms: int | None
-    metadata: dict | None
+    stack_trace: str | None = None
+    http_method: str | None = None
+    http_path: str | None = None
+    http_status: int | None = None
+    response_time_ms: int | None = None
+    extra_metadata: dict | None = None
+
+    # Alias for frontend compatibility
+    @property
+    def service(self) -> str | None:
+        return self.service_name
 
     class Config:
         from_attributes = True
+
+    def model_dump(self, **kwargs):
+        data = super().model_dump(**kwargs)
+        data['service'] = self.service_name  # Add service alias
+        return data
 
 
 class LogEventBatch(BaseModel):
