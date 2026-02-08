@@ -172,7 +172,7 @@ log_info "Detected system: $OS $ARCH"
 
 # Set default download URL if not provided (Bug B8 fix)
 if [ -z "$DOWNLOAD_URL" ]; then
-    DOWNLOAD_URL="https://github.com/appscope/agent/releases/download/v${VERSION}/appscope-${OS}-${ARCH}"
+    DOWNLOAD_URL="https://github.com/Jacobgokul/AppScope/releases/download/v${VERSION}/appscope-${OS}-${ARCH}"
 fi
 
 # Check for root
